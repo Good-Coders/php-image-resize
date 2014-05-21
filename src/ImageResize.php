@@ -2,7 +2,8 @@
 
 namespace Eventviva;
 
-class ImageResize {
+class ImageResize
+{
 
     protected $image;
     protected $image_type;
@@ -93,6 +94,52 @@ class ImageResize {
         return $this;
     }
 
+    public function smartResize ($width,$height,$cropOverResize = false){
+
+        $resize = false;
+        if($cropOverResize && ($this->getWidth() > $width && $this->getHeight() > $height)){
+            // only resize the image if it is larger width and height
+            $resize = true;
+            // if it is larger in only one the image will not be re-sized meaning it will get cropped
+        }
+
+        if(!$cropOverResize && ($this->getWidth() > $width || $this->getHeight() > $height)){
+            $resize = true;
+        }
+
+        if($resize) {
+            // check if we should reduce by width or height
+            $aspect_o = $this->getWidth() / $this->getHeight();
+            $aspect_f = $width / $height;
+
+            if ($aspect_o >= $aspect_f) {
+                $this->resizeToWidth($width);
+            } else {
+                $this->resizeToHeight($height);
+            }
+        }
+        return $this->canvas($width,$height);
+    }
+
+    public function canvas($width, $height) {
+        $new_image = imagecreatetruecolor($width, $height);
+        /* Check if this image is PNG or GIF, then set if Transparent */
+        if (($this->image_type == IMAGETYPE_GIF) || ($this->image_type == IMAGETYPE_PNG)) {
+            imagealphablending($new_image, false);
+            imagesavealpha($new_image, true);
+            $transparent = imagecolorallocatealpha($new_image, 255, 255, 255, 127);
+            imagefilledrectangle($new_image, 0, 0, $width, $height, $transparent);
+        } else {
+            // fill with white background
+            $white = imagecolorallocate($new_image, 255, 255, 255);
+            imagefill($new_image, 0, 0, $white);
+        }
+
+        imagecopyresampled($new_image, $this->image, 0, 0, ($width - $this->getWidth()) * 0.5 * -1, ($height - $this->getHeight()) * 0.5 * -1, $width, $height, $width, $height);
+        $this->image = $new_image;
+        return $this;
+    }
+
     public function resize($width, $height, $forcesize = false) {
         /* optional. if file is smaller, do not resize. */
         if ($forcesize === false) {
@@ -115,20 +162,20 @@ class ImageResize {
         $this->image = $new_image;
         return $this;
     }
-    
+
     /* center crops image to desired width height */
-    public function crop($width,$height){
-    	$aspect_o = $this->getWidth()/$this->getHeight();
-    	$aspect_f = $width/$height;
-    
-    	if($aspect_o>=$aspect_f){
-    		$width_n=$this->getWidth() / ($this->getHeight()/$height);
-    		$height_n=$height;
-    	}else{
-    		$width_n=$width;
-    		$height_n=$this->getHeight() / ($this->getWidth()/$width);
-    	}
-    
+    public function crop($width, $height) {
+        $aspect_o = $this->getWidth() / $this->getHeight();
+        $aspect_f = $width / $height;
+
+        if ($aspect_o >= $aspect_f) {
+            $width_n = $this->getWidth() / ($this->getHeight() / $height);
+            $height_n = $height;
+        } else {
+            $width_n = $width;
+            $height_n = $this->getHeight() / ($this->getWidth() / $width);
+        }
+
         $new_image = imagecreatetruecolor($width, $height);
         /* Check if this image is PNG or GIF, then set if Transparent */
         if (($this->image_type == IMAGETYPE_GIF) || ($this->image_type == IMAGETYPE_PNG)) {
@@ -137,10 +184,10 @@ class ImageResize {
             $transparent = imagecolorallocatealpha($new_image, 255, 255, 255, 127);
             imagefilledrectangle($new_image, 0, 0, $width, $height, $transparent);
         }
-        imagecopyresampled($new_image, $this->image, 0 - ($width_n - $width)*0.5, 0 - ($height_n - $height)*0.5, 0, 0, $width_n, $height_n, $this->getWidth(), $this->getHeight());
-        
+        imagecopyresampled($new_image, $this->image, 0 - ($width_n - $width) * 0.5, 0 - ($height_n - $height) * 0.5, 0, 0, $width_n, $height_n, $this->getWidth(), $this->getHeight());
+
         $this->image = $new_image;
         return $this;
     }
- 
+
 }
