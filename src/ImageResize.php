@@ -13,17 +13,13 @@ class ImageResize
     }
 
     public function load($filename) {
+        $this->image_type = exif_imagetype($filename);
 
-        $image_info = getimagesize($filename);
-        $this->image_type = $image_info[2];
-        if ($this->image_type == IMAGETYPE_JPEG) {
-
+        if ($this->image_type === IMAGETYPE_JPEG) {
             $this->image = imagecreatefromjpeg($filename);
-        } elseif ($this->image_type == IMAGETYPE_GIF) {
-
+        } elseif ($this->image_type === IMAGETYPE_GIF) {
             $this->image = imagecreatefromgif($filename);
-        } elseif ($this->image_type == IMAGETYPE_PNG) {
-
+        } elseif ($this->image_type === IMAGETYPE_PNG) {
             $this->image = imagecreatefrompng($filename);
         }
         return $this;
@@ -49,15 +45,25 @@ class ImageResize
         return $this;
     }
 
-    public function output($image_type = IMAGETYPE_JPEG) {
-
-        if ($image_type == IMAGETYPE_JPEG) {
+    public function output($image_type = null) {
+        if($image_type === null){
+            $this->outputSameImageType();
+        }
+        if ($image_type === IMAGETYPE_JPEG) {
             imagejpeg($this->image);
-        } elseif ($image_type == IMAGETYPE_GIF) {
-
+        } elseif ($image_type === IMAGETYPE_GIF) {
             imagegif($this->image);
-        } elseif ($image_type == IMAGETYPE_PNG) {
+        } elseif ($image_type === IMAGETYPE_PNG) {
+            imagepng($this->image);
+        }
+    }
 
+    public function outputSameImageType() {
+        if ($this->image_type === IMAGETYPE_JPEG) {
+            imagejpeg($this->image);
+        } elseif ($this->image_type === IMAGETYPE_GIF) {
+            imagegif($this->image);
+        } elseif ($this->image_type === IMAGETYPE_PNG) {
             imagepng($this->image);
         }
     }
@@ -94,20 +100,20 @@ class ImageResize
         return $this;
     }
 
-    public function smartResize ($width,$height,$cropOverResize = false){
+    public function smartResize($width, $height, $cropOverResize = false) {
 
         $resize = false;
-        if($cropOverResize && ($this->getWidth() > $width && $this->getHeight() > $height)){
+        if ($cropOverResize && ($this->getWidth() > $width && $this->getHeight() > $height)) {
             // only resize the image if it is larger width and height
             $resize = true;
             // if it is larger in only one the image will not be re-sized meaning it will get cropped
         }
 
-        if(!$cropOverResize && ($this->getWidth() > $width || $this->getHeight() > $height)){
+        if (!$cropOverResize && ($this->getWidth() > $width || $this->getHeight() > $height)) {
             $resize = true;
         }
 
-        if($resize) {
+        if ($resize) {
             // check if we should reduce by width or height
             $aspect_o = $this->getWidth() / $this->getHeight();
             $aspect_f = $width / $height;
@@ -118,24 +124,46 @@ class ImageResize
                 $this->resizeToHeight($height);
             }
         }
-        return $this->canvas($width,$height);
+
+        return $this->canvas($width, $height);
     }
 
     public function canvas($width, $height) {
         $new_image = imagecreatetruecolor($width, $height);
+        $white = imagecolorallocate($new_image, 255, 255, 255);
+        $transparent = imagecolorallocatealpha($new_image, 255, 255, 255, 127);
+
+        $fillColor = $white;
+        imagealphablending($new_image, false);
+        imagesavealpha($new_image, true);
+
         /* Check if this image is PNG or GIF, then set if Transparent */
-        if (($this->image_type == IMAGETYPE_GIF) || ($this->image_type == IMAGETYPE_PNG)) {
-            imagealphablending($new_image, false);
-            imagesavealpha($new_image, true);
-            $transparent = imagecolorallocatealpha($new_image, 255, 255, 255, 127);
-            imagefilledrectangle($new_image, 0, 0, $width, $height, $transparent);
+        if (($this->image_type === IMAGETYPE_GIF) || ($this->image_type === IMAGETYPE_PNG)) {
+            $fillColor = $transparent;
+            imagefilledrectangle($new_image, 0, 0, $width, $height, $fillColor);
+            imagesavealpha($this->image, true);
         } else {
-            // fill with white background
-            $white = imagecolorallocate($new_image, 255, 255, 255);
-            imagefill($new_image, 0, 0, $white);
+            imagefill($new_image, 0, 0, $fillColor);
         }
 
-        imagecopyresampled($new_image, $this->image, 0, 0, ($width - $this->getWidth()) * 0.5 * -1, ($height - $this->getHeight()) * 0.5 * -1, $width, $height, $width, $height);
+        $offsetX = ($width - $this->getWidth()) * 0.5 * -1;
+        $offsetY = ($height - $this->getHeight()) * 0.5 * -1;
+        imagecopyresampled($new_image, $this->image, 0, 0, $offsetX, $offsetY, $width, $height, $width, $height);
+        $offsetX = abs($offsetX);
+        $offsetY = abs($offsetY);
+
+        // Fill the sides with color OR transparency
+        if ($offsetX > 0 && $width > $this->getWidth()) {
+            imagefilledrectangle($new_image, 0, 0, $offsetX, $height, $fillColor);
+            imagefilledrectangle($new_image, $offsetX + $this->getWidth(), 0, $width, $height, $fillColor);
+        }
+
+        // Fill the top and bottom with color OR transparency
+        if ($offsetY > 0 && $height > $this->getHeight()) {
+            imagefilledrectangle($new_image, 0, 0, $width, $offsetY, $fillColor);
+            imagefilledrectangle($new_image, 0, $offsetY + $this->getHeight(), $width, $height, $fillColor);
+        }
+
         $this->image = $new_image;
         return $this;
     }
@@ -151,7 +179,7 @@ class ImageResize
 
         $new_image = imagecreatetruecolor($width, $height);
         /* Check if this image is PNG or GIF, then set if Transparent */
-        if (($this->image_type == IMAGETYPE_GIF) || ($this->image_type == IMAGETYPE_PNG)) {
+        if (($this->image_type === IMAGETYPE_GIF) || ($this->image_type === IMAGETYPE_PNG)) {
             imagealphablending($new_image, false);
             imagesavealpha($new_image, true);
             $transparent = imagecolorallocatealpha($new_image, 255, 255, 255, 127);
@@ -178,7 +206,7 @@ class ImageResize
 
         $new_image = imagecreatetruecolor($width, $height);
         /* Check if this image is PNG or GIF, then set if Transparent */
-        if (($this->image_type == IMAGETYPE_GIF) || ($this->image_type == IMAGETYPE_PNG)) {
+        if (($this->image_type === IMAGETYPE_GIF) || ($this->image_type === IMAGETYPE_PNG)) {
             imagealphablending($new_image, false);
             imagesavealpha($new_image, true);
             $transparent = imagecolorallocatealpha($new_image, 255, 255, 255, 127);
