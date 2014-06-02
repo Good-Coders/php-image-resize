@@ -25,28 +25,47 @@ class ImageResize
         return $this;
     }
 
-    public function save($filename, $image_type = IMAGETYPE_PNG, $compression = 75, $permissions = null) {
+    public function save($filename, $image_type = null, $compression = 75, $permissions = null) {
+        if ($image_type === null) {
+            return $this->saveSameImageType($filename, $compression, $permissions);
+        }
 
-        if ($image_type == IMAGETYPE_JPEG) {
+        if ($image_type === IMAGETYPE_JPEG) {
             imagejpeg($this->image, $filename, $compression);
         } elseif ($image_type == IMAGETYPE_GIF) {
 
             imagegif($this->image, $filename);
-        } elseif ($image_type == IMAGETYPE_PNG) {
+        } elseif ($image_type === IMAGETYPE_PNG) {
 
             imagealphablending($this->image, false);
             imagesavealpha($this->image, true);
             imagepng($this->image, $filename);
         }
-        if ($permissions != null) {
+        if ($permissions !== null) {
+            chmod($filename, $permissions);
+        }
+        return $this;
+    }
 
+    public function saveSameImageType($filename, $compression = 75, $permissions = null) {
+        if ($this->image_type === IMAGETYPE_JPEG) {
+            $filename .= (preg_match('/\.[a-z]{3,4}$/i', $filename)) ? '' : '.jpg';
+            imagejpeg($this->image, $filename, $compression);
+        } elseif ($this->image_type === IMAGETYPE_GIF) {
+            $filename .= (preg_match('/\.[a-z]{3,4}$/i', $filename)) ? '' : '.gif';
+            imagegif($this->image, $filename);
+        } elseif ($this->image_type === IMAGETYPE_PNG) {
+            $filename .= (preg_match('/\.[a-z]{3,4}$/i', $filename)) ? '' : '.png';
+            imagepng($this->image, $filename);
+        }
+        if ($permissions !== null) {
             chmod($filename, $permissions);
         }
         return $this;
     }
 
     public function output($image_type = null) {
-        if($image_type === null){
+        if ($image_type === null) {
             $this->outputSameImageType();
         }
         if ($image_type === IMAGETYPE_JPEG) {
@@ -100,32 +119,62 @@ class ImageResize
         return $this;
     }
 
-    public function smartResize($width, $height, $cropOverResize = false) {
+    public function smartResize($width, $height, $cropOverResize = false, $minWidth = false, $minHeight = false) {
+        // Store the aspect ratio
+        $aspect_o = $this->getWidth() / $this->getHeight();
+        $aspect_f = $width / $height;
 
-        $resize = false;
-        if ($cropOverResize && ($this->getWidth() > $width && $this->getHeight() > $height)) {
-            // only resize the image if it is larger width and height
-            $resize = true;
-            // if it is larger in only one the image will not be re-sized meaning it will get cropped
-        }
-
-        if (!$cropOverResize && ($this->getWidth() > $width || $this->getHeight() > $height)) {
-            $resize = true;
-        }
-
-        if ($resize) {
-            // check if we should reduce by width or height
-            $aspect_o = $this->getWidth() / $this->getHeight();
-            $aspect_f = $width / $height;
-
-            if ($aspect_o >= $aspect_f) {
+        // smart crop should reduce the opposite side down then perform crop!
+        if ($cropOverResize) {
+            if (((!$minWidth && !$minHeight) || ($minWidth && $minHeight)) && $this->getWidth() > $width && $this->getHeight() > $height) {
+                // TODO : Fix, this should smartly resize and crop image appropriately
+                // TODO : Should shrink based on if resulting image is hot dog hamburger or square.
+                // If hot dog it should resize it by width
+                // If hamburger it should resize it by height
+                /*
+                    If square it should resize it by the smaller dimension
+                        if orig is
+                            hot dog then height
+                            hamburger then width
+                            if square then either IE same result
+                */
+                if ($aspect_o >= $aspect_f) {
+                    $this->resizeToWidth($width);
+                } else {
+                    $this->resizeToHeight($height);
+                }
+            }  else if ($minHeight && $this->getWidth() > $width) {
+                // TODO : Fix, this should smartly resize and crop image appropriately
                 $this->resizeToWidth($width);
-            } else {
+            } else if ($minWidth && $this->getHeight() > $height) {
+                // TODO : Fix, this should smartly resize and crop image appropriately
+                $this->resizeToWidth($height);
+            }
+
+            // After resize
+            if ((!$minWidth && !$minHeight) || ($minWidth && $this->getWidth() < $width) || ($minHeight && $this->getHeight() < $height)) {
+                $this->canvas($width, $height);
+            }
+
+        } else { // Not Crop
+            if ((!$minWidth && !$minHeight) && ($minWidth && $minHeight) && ($this->getWidth() > $width || $this->getHeight() > $height)) {
+                if ($aspect_o >= $aspect_f) {
+                    $this->resizeToWidth($width);
+                } else {
+                    $this->resizeToHeight($height);
+                }
+            } else if ($minHeight && $this->getWidth() > $width) {
+                $this->resizeToWidth($width);
+            } else if ($minWidth && $this->getHeight() > $height) {
                 $this->resizeToHeight($height);
             }
-        }
 
-        return $this->canvas($width, $height);
+            // After resize
+            if ((!$minWidth && !$minHeight) || ($minWidth && $this->getWidth() < $width) || ($minHeight && $this->getHeight() < $height)) {
+                $this->canvas($width, $height);
+            }
+        }
+        return $this;
     }
 
     public function canvas($width, $height) {
