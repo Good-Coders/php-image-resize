@@ -157,7 +157,7 @@ class ImageResize
             }
 
         } else { // Not Crop
-            if ((!$minWidth && !$minHeight) && ($minWidth && $minHeight) && ($this->getWidth() > $width || $this->getHeight() > $height)) {
+            if (((!$minWidth && !$minHeight) || ($minWidth && $minHeight)) && ($this->getWidth() > $width || $this->getHeight() > $height)) {
                 if ($aspect_o >= $aspect_f) {
                     $this->resizeToWidth($width);
                 } else {
