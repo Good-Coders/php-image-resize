@@ -122,7 +122,7 @@ class ImageResize
     public function smartResize($width, $height, $cropOverResize = false, $minWidth = false, $minHeight = false) {
         // Store the aspect ratio
         $aspect_o = $this->getWidth() / $this->getHeight();
-        $aspect_f = $width / $height;
+        $aspect_f = ($width > 0 && $height > 0) ? $width / $height : $aspect_o;
 
         // smart crop should reduce the opposite side down then perform crop!
         if ($cropOverResize) {
