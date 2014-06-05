@@ -170,7 +170,7 @@ class ImageResize
             }
 
             // After resize
-            if ((!$minWidth && !$minHeight) || ($minWidth && $this->getWidth() < $width) || ($minHeight && $this->getHeight() < $height)) {
+            if ((!$minWidth && !$minHeight) || ($minHeight && $this->getWidth() < $width) || ($minWidth && $this->getHeight() < $height)) {
                 $this->canvas($width, $height);
             }
         }
